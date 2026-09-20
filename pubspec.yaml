@@ -1,0 +1,25 @@
+name: swi_core
+description: >-
+  The layer both SWI apps share: HTTP plumbing, a Result type, and the
+  exception-to-message mapping. No UI, no app configuration.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.10.8
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dio: ^5.9.1
+  flutter_secure_storage: ^10.0.0
+  flutter_svg: ^2.2.3
+  image_picker: ^1.2.1
+  iconsax_flutter: ^1.0.1
+  intl: ^0.20.2
+  internet_connection_checker_plus: ^2.9.1+2
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
