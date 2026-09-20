@@ -32,3 +32,4 @@ design, and a package that reached for them would not be a package.
 - Nothing here logs unconditionally; `AppLog` is wrapped in `kDebugMode`.
 - A widget that needs to know about theme or state takes it as a parameter, or
   reads it off the widget tree — never from a provider.
+# swi_core
