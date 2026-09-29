@@ -37,6 +37,7 @@ export 'src/network/general_exceptions.dart';
 export 'src/network/make_request.dart';
 export 'src/network/network_status.dart';
 export 'src/network/result.dart';
+export 'src/network/server_error_message.dart';
 export 'src/network/smart_handler.dart';
 export 'src/network/status_code.dart';
 export 'src/network/status_to_message.dart';

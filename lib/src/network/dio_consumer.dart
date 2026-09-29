@@ -4,6 +4,7 @@ import 'package:swi_core/src/network/api_consumer.dart';
 import 'package:swi_core/src/network/status_code.dart';
 import 'package:swi_core/src/network/exception_to_message.dart';
 import 'package:swi_core/src/network/api_message_model.dart';
+import 'package:swi_core/src/network/server_error_message.dart';
 
 class DioConsumer implements ApiConsumer<APiResponse> {
   const DioConsumer({required this.dio});
@@ -82,12 +83,18 @@ class DioConsumer implements ApiConsumer<APiResponse> {
     );
   }
 
+  /// The status the server answered with is kept: it was always 0, so a
+  /// refused request looked like one that never reached the server.
   APiResponseError _exceptionError(Object e) {
-    return APiResponseError(error: ExceptionToMessage.message(e), code: 000);
+    final code = e is DioException ? e.response?.statusCode ?? 0 : 0;
+    return APiResponseError(error: ExceptionToMessage.message(e), code: code);
   }
 
+  /// The server's own reason rather than the HTTP reason phrase
+  /// ("Unprocessable Entity").
   APiResponseError _responseError(Response<dynamic> response) {
-    return APiResponseError(error: response.statusMessage ?? 'Error', code: response.statusCode ?? 500);
+    final code = response.statusCode ?? 500;
+    return APiResponseError(error: ServerErrorMessage.from(response.data, code), code: code);
   }
 
   bool isSucces(int? statusCode) {

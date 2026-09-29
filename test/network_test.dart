@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:swi_core/swi_core.dart';
 
@@ -114,6 +118,89 @@ void main() {
     });
   });
 
+  group('ServerErrorMessage', () {
+    test("Laravel's validation shape: the field errors, one per line", () {
+      const body = {
+        'message': 'The serial number has already been taken. (and 1 more error)',
+        'errors': {
+          'serial_number': ['الرقم التسلسلي مستخدم من قبل'],
+          'image': ['الصورة مطلوبة'],
+        },
+      };
+
+      expect(ServerErrorMessage.from(body, 422), 'الرقم التسلسلي مستخدم من قبل\nالصورة مطلوبة');
+    });
+
+    test('field errors under data, as SmartHandler reads them', () {
+      const body = {
+        'success': false,
+        'message': 'validation error',
+        'data': {'name': 'الاسم مطلوب'},
+      };
+
+      expect(ServerErrorMessage.from(body, 422), 'الاسم مطلوب');
+    });
+
+    test('only a message: the message', () {
+      expect(ServerErrorMessage.from(const {'success': false, 'message': 'الحافظة مرتبطة بمتجر', 'data': null}, 400),
+          'الحافظة مرتبطة بمتجر');
+    });
+
+    test('an HTML page or an empty reply falls back to the status', () {
+      expect(ServerErrorMessage.from('<html>413 Request Entity Too Large</html>', 413), 'حجم الملف أكبر من المسموح به');
+      expect(ServerErrorMessage.from(const {'message': ''}, 500), 'حدث خطأ في الخادم (500)');
+      expect(ServerErrorMessage.from(null, null), 'تعذر الاتصال بالخادم');
+    });
+  });
+
+  group('DioConsumer with a refused request', () {
+    Future<APiResponse> post(int status, Object body, {bool throwOnError = true}) {
+      final dio = Dio(BaseOptions(validateStatus: throwOnError ? null : (_) => true))
+        ..httpClientAdapter = _Reply(status, body);
+      return DioConsumer(dio: dio).post('/refrigerators/create', body: const {});
+    }
+
+    test("keeps the server's reason and its status code", () async {
+      final response = await post(422, const {
+        'message': 'The given data was invalid.',
+        'errors': {
+          'serial_number': ['الرقم التسلسلي مستخدم من قبل'],
+        },
+      });
+
+      // It used to be an empty message with the code 0.
+      expect(response.msg, 'الرقم التسلسلي مستخدم من قبل');
+      expect(response.statusCode, 422);
+    });
+
+    test('an HTML error page reads as a sentence for its status', () async {
+      final response = await post(500, '<!DOCTYPE html><html>Server Error</html>');
+
+      expect(response.msg, 'حدث خطأ في الخادم (500)');
+      expect(response.statusCode, 500);
+    });
+
+    test('a returned error response gives the reason, not the HTTP phrase', () async {
+      final response = await post(422, const {'message': 'البيانات غير مكتملة'}, throwOnError: false);
+
+      expect(response.msg, 'البيانات غير مكتملة');
+      expect(response.statusCode, 422);
+    });
+
+    test('reaches the caller as a Left with that reason', () async {
+      const runner = DioMakeRequest(networkStatus: _Online());
+
+      final result = await runner<Object?>(
+        () => post(403, const {'message': 'ليس لديك صلاحية الإضافة'}),
+        (data) => data,
+      );
+
+      expect(result, isA<Left<Object?>>());
+      expect(result.msg, 'ليس لديك صلاحية الإضافة');
+      expect(result.code, 403);
+    });
+  });
+
   test('APiResponse classifies itself by status', () {
     const ok = APiResposnseSuccess(code: 204, value: 1, message: 'done');
     const bad = APiResponseError(code: 500, error: 'boom');
@@ -136,4 +223,26 @@ class _Offline implements NetworkStatus {
 
   @override
   Future<bool> get isConnected async => false;
+}
+
+/// Answers every request with [status] and [body], like the server.
+class _Reply implements HttpClientAdapter {
+  _Reply(this.status, this.body);
+  final int status;
+  final Object body;
+
+  @override
+  Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
+    final isText = body is String;
+    return ResponseBody.fromString(
+      isText ? body as String : jsonEncode(body),
+      status,
+      headers: {
+        Headers.contentTypeHeader: [isText ? 'text/html' : Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }

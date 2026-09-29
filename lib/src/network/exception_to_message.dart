@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:swi_core/src/network/general_exceptions.dart';
-import 'package:swi_core/src/network/api_message_model.dart';
+import 'package:swi_core/src/network/server_error_message.dart';
 
 class ExceptionToMessage {
   static String message(dynamic ex) {
@@ -9,13 +9,9 @@ class ExceptionToMessage {
   }
 
   static String _handleDioException(DioException ex) {
-    try {
-      if (ex.response?.data != null) {
-        return APIMessageHandler.fromJson(ex.response?.data).message;
-      }
-      return 'حدث خطأ في الاتصال بالخادم';
-    } catch (e) {
-      return 'حدث خطأ غير متوقع';
-    }
+    final response = ex.response;
+    // The server answered: its own reason, wherever it put it.
+    if (response != null) return ServerErrorMessage.from(response.data, response.statusCode);
+    return 'حدث خطأ في الاتصال بالخادم';
   }
 }
